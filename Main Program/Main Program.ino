@@ -4,10 +4,10 @@
 // Motor Variables
 
 // https://www.pololu.com/docs/0J83/5.9
-#define L_PWM_PIN ?
-#define L_DIR_PIN ?
-#define R_PWM_PIN ?
-#define R_DIR_PIN ?
+#define L_PWM_PIN 10
+#define L_DIR_PIN 16
+#define R_PWM_PIN 9
+#define R_DIR_PIN 15
 
 #define FWD ?
 #define REV ?

@@ -18,7 +18,7 @@ void setup() {
   Serial.begin(9600);
   while (!Serial); //comment out when not connected to laptop
   Serial.print("Setup Complete \n");
-  delay(5000);
+  //delay(5000);
 }
 
 
@@ -70,5 +70,5 @@ void irRead() {  // CONVERT TO READ AND WRITE LS ARRAY
 
   // Delay, just so that we have time toread the
   // values when using Serial.print().
-  delay(1000);
+  delay(10);
 }
