@@ -1,6 +1,6 @@
 const int XOREncoderA = 26;
 const int BpinEncoderA = PE2;
-const int EncoderAINT = 26;  // --> IDK WTF IS GOING ON WITH THIS ENCODER INTERRUPT PIN I CANT WORK OUT WHAT IT IS
+const int EncoderAINT = 26;
 
 const int XOREncoderB = 7;
 const int BpinEncoderB = 23;
@@ -10,6 +10,8 @@ volatile bool A = 0, B = 0, XOR = 0;
 int encoderACount = 0;
 int encoderBCount = 0;
 
+float localX = 0, localY = 0, localTheta = 0, globalX = 0, globalY = 0, globalTheta = 0, oldGlobalX = 0, oldGlobalY = 0, oldGlobalTheta = 0, oldA = 0, oldB = 0, newA, newB;
+
 bool flag = false;
 
 volatile bool positionTable[2][4];
@@ -17,12 +19,16 @@ const int motorA = 0, motorB = 1;
 const int aOld = 0, bOld = 1, aNew = 2, bNew = 3;
 
 
+// int deltaCountA, deltaCountB;
+long deltaCountA, deltaCountB;
 
+const float CPR = 358.32;  //left 355
 
-const float CPR = 358.3;
+// const float r = 16;  // 32 / 2 = 16
+// const float l = 48.4;
+const float r = 16.5;
+const float l = 42.5;
 
-const float r = 16;  // 32 / 2 = 16
-const float l = 48.4;
 
 int prevFrameTime, currFrameTime;
 float targetHeading;
@@ -48,20 +54,123 @@ void loop() {
 
 
   updateOdometry();
+  
   Serial.print(encoderACount);
   Serial.print(" | ");
   Serial.print(encoderBCount);
+  Serial.print(" | newA ");
+  Serial.print(newA);
+  Serial.print(" | newB ");
+  Serial.print(newB);
+  Serial.print(" | oldA ");
+  Serial.print(oldA);
+  Serial.print(" | oldB ");
+  Serial.print(oldB);
   Serial.print(" | ");
-  Serial.print(odometryMatrix[0]);
+  Serial.print(deltaCountA);
   Serial.print(" | ");
-  Serial.print(odometryMatrix[1]);
+  Serial.print(deltaCountB);
   Serial.print(" | ");
-  Serial.print(currentPosition[theta]);
+  Serial.print(localX);
+  Serial.print(" | ");
+  Serial.print(localY);
+  Serial.print(" | ");
+  Serial.print(localTheta);
+  Serial.print(" | ");
+  Serial.print(globalX);
+  Serial.print(" | ");
+  Serial.print(globalY);
+  Serial.print(" | ");
+  Serial.print(globalTheta);
   Serial.println(" | ");
+  
 }
 
+// ------------------------------------------- * LOOK HERE BIT * -------------------------------------------
 
 void updateOdometry() {
+
+  float currentTimeOdo, oldTimeOdo;
+  newA = encoderACount;
+  newB = encoderBCount;
+
+  if (newA != oldA) {
+    deltaCountA = newA - oldA;
+  } else {
+    deltaCountA = 0;
+  }
+
+  if (newB != oldB) {
+    deltaCountB = newB - oldB;
+  } else {
+    deltaCountB = 0;
+  }
+
+  float f_deltaCountA = (float)deltaCountA;
+  float f_deltaCountB = (float)deltaCountB;
+
+  currentTimeOdo = millis();
+
+  // float deltaTime = currentTimeOdo - oldTimeOdo;
+  unsigned long u1_deltaTime = currentTimeOdo - oldTimeOdo;
+  float deltaTime = (float)u1_deltaTime;
+
+  //S = rø
+  //const float anglePerCount = 360 / CPR;
+
+  // work in rad not degrees
+
+  const float distPerCount = (2.0 * r * PI) / CPR;  //circumference mm / CPR . Therefore 1 count = (something)mm
+  // float lPhi = r * ((anglePerCount * deltaCountA) / deltaTime);
+  // float rPhi = r * ((anglePerCount * deltaCountB) / deltaTime);
+
+  // float lPhi = r * (distPerCount * deltaCountA) * (PI / 180);
+  // float rPhi = r * (distPerCount * deltaCountB) * (PI / 180);
+  float lPhi = (distPerCount * f_deltaCountA);
+  float rPhi = (distPerCount * f_deltaCountB);
+
+
+  //if (deltaCountA != 0 || deltaCountB != 0) {
+  localX = (lPhi / 2.0) + (rPhi / 2.0);
+  //localY = 0;
+  localTheta = (lPhi / (2.0 * l)) - (rPhi / (2.0 * l));
+
+  //localTheta = (localTheta) * (PI / 180);
+
+  globalX = globalX + (localX * cos(globalTheta));
+  globalY = globalY + (localX * sin(globalTheta));
+  globalTheta = globalTheta + localTheta;
+  //}
+
+  // while (globalTheta > 360 || globalTheta < 0) {
+  //   if (globalTheta > 360) {
+  //     globalTheta -= 360;
+  //   } else if (globalTheta < 0) {
+  //     globalTheta += 360;
+  //   }
+  // }
+
+  // oldGlobalPhi = globalPhi;
+  // oldGlobalY = globalY;
+  // oldGlobalTheta = globalTheta;
+
+
+  oldA = newA;
+  oldB = newB;
+
+
+  oldTimeOdo = millis();
+  //delay(100);
+}
+
+// ------------------------------------------- * LOOK HERE BIT * -------------------------------------------
+
+
+
+
+
+/*
+
 
   const float distPerCount = (M_PI * 2 * r) / CPR;
 
@@ -83,6 +192,7 @@ void updateOdometry() {
     new_y = y - R * cos(wd + heading) + R * cos(heading);
     new_heading = boundAngle(heading + wd);
   }
+*/
 
 
 
@@ -90,26 +200,6 @@ void updateOdometry() {
 
 
 
-
-  float distA, distB;
-
-  distA = deltaCountA * distPerCount;
-  distB = deltaCountB * distPerCount;
-
-  //forward travel to grid
-  odometryMatrix[0] = ((r * distA) / 2) + ((r * distB) / 2);
-  // New X
-  currentPosition[x] = currentPosition[x] + (odometryMatrix[0] * cos(currentPosition[theta] * (M_PI / 180) /* turn to radians */));
-  // New Y
-  currentPosition[y] = currentPosition[y] + (odometryMatrix[0] * sin(currentPosition[theta] * (M_PI / 180) /* turn to radians */));
-
-  //delta heading to new heading
-  odometryMatrix[2] = ((r * distA) / (2 * l)) + ((r * distB) / (2 * l));
-  currentPosition[theta] = currentPosition[theta] + odometryMatrix[2];
-
-  oldEncoderA = encoderACount;
-  oldEncoderB = encoderBCount;
-}
 
 // void pointNavigation(float targetX, float targetY, float targetTheta) {
 //   float deltaX, deltaY, hypotenuse;
@@ -201,20 +291,20 @@ void EncoderBISR() {
 
   if ((positionTable[motorB][aNew] == HIGH && positionTable[motorB][bOld] == HIGH) || (positionTable[motorB][aNew] == LOW && positionTable[motorB][bOld] == LOW)) {
     encoderBCount--;
-    Serial.print("Pos++ | ");
+    //Serial.print("Pos++ | ");
   } else if ((positionTable[motorB][aNew] == HIGH && positionTable[motorB][bOld] == LOW) || (positionTable[motorB][aNew] == LOW && positionTable[motorB][bOld] == HIGH)) {
     encoderBCount++;
-    Serial.print("Neg-- | ");
+    //Serial.print("Neg-- | ");
   }
 
-  Serial.print("EncoderBCount = ");
-  Serial.print(encoderBCount);
-  Serial.print(" | ");
-  Serial.print(A);
-  Serial.print(B);
-  Serial.print(" | ");
-  Serial.print(B);
-  Serial.println(XOR);
+  // Serial.print("EncoderBCount = ");
+  // Serial.print(encoderBCount);
+  // Serial.print(" | ");
+  // Serial.print(A);
+  // Serial.print(B);
+  // Serial.print(" | ");
+  // Serial.print(B);
+  // Serial.println(XOR);
 }
 
 
@@ -258,14 +348,14 @@ ISR(PCINT0_vect) {
     encoderACount++;
   }
 
-  Serial.print("EncoderACount = ");
-  Serial.print(encoderACount);
-  Serial.print(" | ");
-  Serial.print(A);
-  Serial.print(B);
-  Serial.print(" | ");
-  Serial.print(B);
-  Serial.println(XOR);
+  // Serial.print("EncoderACount = ");
+  // Serial.print(encoderACount);
+  // Serial.print(" | ");
+  // Serial.print(A);
+  // Serial.print(B);
+  // Serial.print(" | ");
+  // Serial.print(B);
+  // Serial.println(XOR);
 }
 
 

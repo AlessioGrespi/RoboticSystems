@@ -1,10 +1,12 @@
 #include <string.h>
 
+// Motor Setup
 #define L_PWM_PIN 10
 #define L_DIR_PIN 16
 #define R_PWM_PIN 9
 #define R_DIR_PIN 15
 
+// Line Sensor Setup
 #define LL_LS_PIN A11
 #define L_LS_PIN A0
 #define M_LS_PIN A2
@@ -24,21 +26,15 @@ unsigned long LSthreshold = 1500;
 
 int FSM = 1;
 
-bool timerFlag = false;
-
-
-int lineDetected;
-
 void setup() {
-  // put your setup code here, to run once:
   // Motor Setup
   pinMode(L_PWM_PIN, OUTPUT);
   pinMode(L_DIR_PIN, OUTPUT);
   pinMode(R_PWM_PIN, OUTPUT);
   pinMode(R_DIR_PIN, OUTPUT);
 
+  // Line Sensors Setup
   pinMode(IR_LED_PWR_PIN, OUTPUT);
-
   pinMode(LL_LS_PIN, INPUT);
   pinMode(L_LS_PIN, INPUT);
   pinMode(M_LS_PIN, INPUT);
@@ -53,36 +49,36 @@ void setup() {
   //   ;  //comment out when not connected to laptop
   Serial.print("Setup Complete \n");
 
-  //motorMove(50, 0, 50, 0);
-  delay(2000);
+  delay(2000); 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   int SensorState = 0;
+
   irRead();
 
   switch (FSM) {
-    case 1:  //go to and lock onto line
-      motorMove(40, 40);
-      if ((elapsed_time[1] > 1000) || (elapsed_time[2] > 1000) || (elapsed_time[3] > 1000)) {
+    case 1:  // Go to and lock onto line
+      motorMove(40, 40); // Straight forwards
+
+      if ((elapsed_time[1] > 1000) || (elapsed_time[2] > 1000) || (elapsed_time[3] > 1000)) { // Detect Line
         delay(200);
         motorMove(0, 0);
         irRead();
-        if ((elapsed_time[0] > 1000) || (elapsed_time[1] > 1000)) {
+        if ((elapsed_time[0] > 1000) || (elapsed_time[1] > 1000)) { // If on left
           while (elapsed_time[2] < 1200) {
             irRead();
             motorMove(40, -40);
           }
-        } else if ((elapsed_time[3] > 1000) || (elapsed_time[4] > 1000)) {
+        } else if ((elapsed_time[3] > 1000) || (elapsed_time[4] > 1000)) { // If on Right
           while (elapsed_time[2] < 1200) {
             irRead();
-            motorMove(-40, 40);
+            motorMove(-40, 40); 
           }
         } else {
-          while (elapsed_time[2] < 1200) {
+          while (elapsed_time[2] < 1200) { // If undecided
             irRead();
-            motorMove(-40, 40);
+            motorMove(-40, 40); 
           }
         }
         motorMove(0, 0);
@@ -90,16 +86,10 @@ void loop() {
       }
       break;
     case 2:  //follow line
-      // if (timerFlag == false) {
-      //   case2Start = millis() + 5000;
-      //   timerFlag = true;
-      // }
-
       dumbController();
 
-
       if ((elapsed_time[0] < 1000) && (elapsed_time[1] < 1000) && (elapsed_time[2] < 1000) && (elapsed_time[3] < 1000) && (elapsed_time[4] < 1000)) {
-        if (case2Start == true) {  //180
+        if (case2Start == true) {  // 180, bool flag ensure that 180 only runs once so that later gap can be overcome. 
           motorMove(0, 0);
           delay(1000);
           motorMove(40, -40);
@@ -110,8 +100,6 @@ void loop() {
           FSM = 3;
         }
       }
-
-
 
       //90
       if ((elapsed_time[0] > 1200) || (elapsed_time[4] > 1200)) {
@@ -132,12 +120,13 @@ void loop() {
             motorMove(-30, 30);
           } while (elapsed_time[2] < 1200);
         }
-        case2Start = false;
+        case2Start = false; // if a 90˚ turn has been performed a 180 is no longer required. 
       }
+
       break;
     case 3:  //cover gap
       motorMove(40, 40);
-      if ((elapsed_time[1] > 1200) || (elapsed_time[2] > 1200) || (elapsed_time[3] > 1200)) {
+      if ((elapsed_time[1] > 1200) || (elapsed_time[2] > 1200) || (elapsed_time[3] > 1200)) { // Detect end of gap
         motorMove(0, 0);
         FSM = 4;
       }
@@ -166,7 +155,7 @@ void loop() {
         }
       }
 
-      if ((elapsed_time[1] < 1000) && (elapsed_time[2] < 1000) && (elapsed_time[3] < 1000)) {
+      if ((elapsed_time[1] < 1000) && (elapsed_time[2] < 1000) && (elapsed_time[3] < 1000)) { // End of line
         motorMove(0, 0);
         FSM = 5;
       }
@@ -177,7 +166,7 @@ void loop() {
       FSM = 6;
       break;
     case 6:
-    
+
       break;
   }
 
@@ -288,30 +277,9 @@ void irRead() {
     }
   }
 
-  lineDetected = 4;
-
   for (int i = 0; i < 5; i++) {
     elapsed_time[i] = end_time[i] - start_time;
     Serial.print(elapsed_time[i]);
     Serial.print(" | ");
-    // if (i < 4) {
-    //   Serial.print(" | ");
-    // }
-    if (elapsed_time[i] > LSthreshold) {
-      lineDetected++;
-    } else if (elapsed_time[i] < LSthreshold) {
-      lineDetected--;
-    }
-    //delay(100);
   }
-
-  // Serial.print(lineDetected);
-  // Serial.print(" | ");
-  // if (lineDetected > 0) {
-  //   Serial.print("Line Detected");
-  // } else {
-  //   Serial.print("No Line Detected");
-  // }
-  Serial.println("");
-  lineDetected = 4;
 }
